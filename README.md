@@ -86,6 +86,8 @@ npm run lint
 
 Type definitions are published under `./types` (see `package.json` `"types"`).
 
+**Maintainers — publish to npm:** log in (`npm login`), then for this prerelease line use `npm publish --tag beta` (required for `1.0.0-beta.x`). Consumers install with `npm install wdk-wallet-nostr@beta` until a stable `latest` release exists.
+
 ## License
 
 Apache-2.0

@@ -1,15 +1,32 @@
 {
   "name": "wdk-wallet-nostr",
   "version": "1.0.0-beta.1",
-  "description": "WDK module to create and manage BIP-32 wallets for the nostr blockchain.",
+  "description": "WDK wallet module for Nostr: NIP-06 derivation, signing, and relay event publishing.",
   "keywords": [
     "wdk",
     "wallet",
     "bip-32",
-    "nostr"
+    "nostr",
+    "nip-06"
   ],
-  "author": "Vib-UX &lt;vibhav@instaraise.io&gt;",
+  "author": "Vib-UX <vibhav@instaraise.io>",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vib-UX/wdk-wallet-nostr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Vib-UX/wdk-wallet-nostr/issues"
+  },
+  "homepage": "https://github.com/Vib-UX/wdk-wallet-nostr#readme",
+  "files": [
+    "index.js",
+    "bare.js",
+    "src",
+    "types",
+    "LICENSE",
+    "README.md"
+  ],
   "main": "index.js",
   "type": "module",
   "types": "./types",
@@ -20,7 +37,8 @@
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
     "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "git:commit": "git -c core.hooksPath=scripts/no-hooks commit -F commitmsg",
-    "git:amend": "git -c core.hooksPath=scripts/no-hooks commit --amend -F commitmsg"
+    "git:amend": "git -c core.hooksPath=scripts/no-hooks commit --amend -F commitmsg",
+    "prepublishOnly": "npm test"
   },
   "dependencies": {
     "@scure/bip32": "^2.0.1",

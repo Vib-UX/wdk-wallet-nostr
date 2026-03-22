@@ -2,7 +2,12 @@
   "name": "wdk-wallet-nostr",
   "version": "1.0.0-beta.1",
   "description": "WDK module to create and manage BIP-32 wallets for the nostr blockchain.",
-  "keywords": ["wdk", "wallet", "bip-32", "nostr"],
+  "keywords": [
+    "wdk",
+    "wallet",
+    "bip-32",
+    "nostr"
+  ],
   "author": "Vib-UX &lt;vibhav@instaraise.io&gt;",
   "license": "Apache-2.0",
   "main": "index.js",
@@ -16,9 +21,12 @@
     "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
   },
   "dependencies": {
+    "@scure/bip32": "^2.0.1",
     "@tetherto/wdk-wallet": "^1.0.0-beta.1",
     "bare-node-runtime": "^1.1.4",
-    "bip39": "^3.1.0"
+    "bip39": "^3.1.0",
+    "nostr-tools": "^2.23.3",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

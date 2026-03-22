@@ -16,26 +16,31 @@
 
 import { WalletAccountReadOnly } from '@tetherto/wdk-wallet'
 
+import { verifyMessage } from './nostr-message-sign.js'
+
 /** @typedef {import('@tetherto/wdk-wallet').TransactionResult} TransactionResult */
 /** @typedef {import('@tetherto/wdk-wallet').TransferOptions} TransferOptions */
 /** @typedef {import('@tetherto/wdk-wallet').TransferResult} TransferResult */
 
 /**
  * @typedef {Object} NostrTransaction
- * @property {string} to - The transaction's recipient.
- * @property {number | bigint} value - The amount of native coins to send to the recipient (in base units).
+ * @property {number} [kind] - Nostr event kind (default: 1).
+ * @property {string} [content] - Event content (default: '').
+ * @property {string[][]} [tags] - Event tags (default: []).
+ * @property {string} [relayUrl] - WebSocket relay URL for publishing (overrides config).
  */
 
 /**
  * @typedef {Object} NostrWalletConfig
- * @property {number | bigint} [transferMaxFee] - The maximum fee amount for transfer operations.
+ * @property {string} [relayUrl] - Default relay URL for publishing events (wss://…).
+ * @property {number | bigint} [transferMaxFee] - Reserved; Nostr has no on-chain fees in this module.
  */
 
 export default class WalletAccountReadOnlyNostr extends WalletAccountReadOnly {
   /**
    * Creates a new nostr read-only wallet account.
    *
-   * @param {string} address - The account's address.
+   * @param {string} address - The account's public key (64 hex chars, x-only secp256k1).
    * @param {Omit<NostrWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
    */
   constructor (address, config = {}) {
@@ -51,63 +56,62 @@ export default class WalletAccountReadOnlyNostr extends WalletAccountReadOnly {
   }
 
   /**
-   * Verifies a message's signature.
+   * Verifies a message's signature (Schnorr over SHA-256 of UTF-8), as produced by {@link WalletAccountNostr#sign}.
    *
    * @param {string} message - The original message.
-   * @param {string} signature - The signature to verify.
+   * @param {string} signature - The hex-encoded signature.
    * @returns {Promise<boolean>} True if the signature is valid.
-   * @throws {Error} If the read-only wallet account class is not able to provide an implementation for the method.
    */
   async verify (message, signature) {
-    // TODO: Implement blockchain-specific message verifying
+    const pubkeyHex = await this.getAddress()
+    return verifyMessage(message, signature, pubkeyHex)
   }
 
   /**
-   * Returns the account's native coin balance.
+   * Nostr has no native token balance; returns 0.
    *
-   * @returns {Promise<bigint>} The native coin balance (in base units).
+   * @returns {Promise<bigint>} Always 0n.
    */
   async getBalance () {
-    // TODO: Implement blockchain-specific balance fetching
+    return 0n
   }
 
   /**
-   * Returns the account balance for a specific token.
+   * Nostr has no fungible token layer in this module; returns 0.
    *
-   * @param {string} tokenAddress - The smart contract address of the token.
-   * @returns {Promise<bigint>} The token balance (in base units).
+   * @returns {Promise<bigint>} Always 0n.
    */
-  async getTokenBalance (tokenAddress) {
-    // TODO: Implement blockchain-specific token balance fetching
+  async getTokenBalance (_tokenAddress) {
+    return 0n
   }
 
   /**
-   * Quotes the costs of a send transaction operation.
+   * Quotes the costs of publishing an event (no network fee at the protocol layer).
    *
-   * @param {NostrTransaction} tx - The transaction.
-   * @returns {Promise<Omit<TransactionResult, 'hash'>>} The transaction's quotes.
+   * @param {NostrTransaction} [_tx] - The planned event publish.
+   * @returns {Promise<Omit<TransactionResult, 'hash'>>}
    */
-  async quoteSendTransaction (tx) {
-    // TODO: Implement blockchain-specific transaction fee estimation
+  async quoteSendTransaction (_tx) {
+    return { fee: 0n }
   }
 
   /**
-   * Quotes the costs of a transfer operation.
+   * Quotes transfer costs. Token transfers are not supported for Nostr in this module.
    *
-   * @param {TransferOptions} options - The transfer's options.
-   * @returns {Promise<Omit<TransferResult, 'hash'>>} The transfer's quotes.
+   * @param {TransferOptions} [_options] - Unused.
+   * @returns {Promise<Omit<TransferResult, 'hash'>>}
    */
-  async quoteTransfer (options) {
-    // TODO: Implement blockchain-specific transfer fee estimation
+  async quoteTransfer (_options) {
+    return { fee: 0n }
   }
 
   /**
-   * Returns a transaction's receipt.
+   * Returns a transaction receipt if available. Relays do not expose a unified receipt API; returns null.
    *
-   * @param {string} hash - The transaction's hash.
-   * @returns {Promise<unknown | null>} The receipt, or null if the transaction has not been included in a block yet.
+   * @param {string} _hash - Event id (hex).
+   * @returns {Promise<null>}
    */
-  async getTransactionReceipt (hash) {
-    // TODO: Implement blockchain-specific transaction receipt fetching
+  async getTransactionReceipt (_hash) {
+    return null
   }
 }

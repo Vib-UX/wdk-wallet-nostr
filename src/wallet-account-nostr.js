@@ -14,9 +14,15 @@
 
 'use strict'
 
+import { HDKey } from '@scure/bip32'
 import * as bip39 from 'bip39'
+import { finalizeEvent, getPublicKey } from 'nostr-tools/pure'
+import { hexToBytes } from '@noble/hashes/utils'
 
 import WalletAccountReadOnlyNostr from './wallet-account-read-only-nostr.js'
+
+import { publishEvent } from './publish-event.js'
+import { signMessage } from './nostr-message-sign.js'
 
 /** @typedef {import('@tetherto/wdk-wallet').IWalletAccount} IWalletAccount */
 
@@ -28,120 +34,181 @@ import WalletAccountReadOnlyNostr from './wallet-account-read-only-nostr.js'
 /** @typedef {import('./wallet-account-read-only-nostr.js').NostrTransaction} NostrTransaction */
 /** @typedef {import('./wallet-account-read-only-nostr.js').NostrWalletConfig} NostrWalletConfig */
 
-// TODO: Update BIP-44 coin type for blockchain nostr
-// See: https://github.com/satoshilabs/slips/blob/master/slip-0044.md
-const BIP_44_DERIVATION_PATH_PREFIX = "m/44'/0'"
+/**
+ * [NIP-06](https://github.com/nostr-protocol/nips/blob/master/06.md) + SLIP-0044 coin type 1237.
+ *
+ * @see https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+ */
+const BIP_44_NOSTR_DERIVATION_PATH_PREFIX = "m/44'/1237'"
 
 /** @implements {IWalletAccount} */
 export default class WalletAccountNostr extends WalletAccountReadOnlyNostr {
   /**
-   * Creates a new nostr wallet account.
-   *
    * @private
-   * @param {string | Uint8Array} seed - The wallet's [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) seed.
-   * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
-   * @param {NostrWalletConfig} [config] - The configuration object.
+   * @param {string | Uint8Array} seed - BIP-39 seed bytes or mnemonic string.
+   * @param {string} path - Path suffix (e.g. "0'/0/0").
+   * @param {NostrWalletConfig} [config] - Configuration.
    */
   constructor (seed, path, config = {}) {
-    // TODO: Derive the account's address and pass it to the super constructor.
-    //       If the address derivation requires async operations, use undefined
-    //       instead and then override the 'getAddress(): Promise<string>' method
-    //       to derive and return it.
-    super(address, config)
+    if (typeof seed === 'string') {
+      if (!bip39.validateMnemonic(seed)) {
+        throw new Error('The seed phrase is invalid.')
+      }
+      seed = bip39.mnemonicToSeedSync(seed)
+    }
+
+    super(undefined, config)
 
     /**
-     * The wallet account configuration.
-     *
      * @protected
      * @type {NostrWalletConfig}
      */
     this._config = config
+
+    /** @private @type {Uint8Array | undefined} */
+    this._seed = seed
+
+    /** @private @type {string} */
+    this._path = `${BIP_44_NOSTR_DERIVATION_PATH_PREFIX}/${path}`
+
+    /** @private @type {Uint8Array | undefined} */
+    this._rawPrivateKey = undefined
+
+    /** @private @type {Uint8Array | undefined} */
+    this._rawPublicKey = undefined
+
+    /** @private @type {string | undefined} */
+    this._pubkeyHex = undefined
   }
 
   /**
-   * Creates a new nostr wallet account.
-   *
-   * @param {string | Uint8Array} seed - The wallet's [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) seed.
-   * @param {string} path - The BIP-44 derivation path (e.g. "0'/0/0").
-   * @param {NostrWalletConfig} [config] - The configuration object.
-   * @returns {Promise<WalletAccountNostr>} The wallet account.
+   * @param {string | Uint8Array} seed - BIP-39 seed or mnemonic.
+   * @param {string} path - Path suffix (e.g. "0'/0/0").
+   * @param {NostrWalletConfig} [config] - Configuration.
+   * @returns {Promise<WalletAccountNostr>}
    */
   static async at (seed, path, config = {}) {
     const account = new WalletAccountNostr(seed, path, config)
+
+    const hdKey = HDKey.fromMasterSeed(account._seed)
+    const derived = hdKey.derive(account._path)
+
+    if (!derived.privateKey) {
+      throw new Error('Failed to derive a private key for this path.')
+    }
+
+    const sk = new Uint8Array(derived.privateKey)
+    account._rawPrivateKey = sk
+    account._pubkeyHex = getPublicKey(sk)
+    account._rawPublicKey = hexToBytes(account._pubkeyHex)
 
     return account
   }
 
   /**
-   * The derivation path's index of this account.
-   *
    * @type {number}
    */
   get index () {
-    // TODO: Return the proper index for the account
+    const segments = this._path.split('/')
+    return parseInt(segments[3].replace("'", ''), 10)
   }
 
   /**
-   * The derivation path of this account.
+   * Full BIP-32 path (e.g. m/44'/1237'/0'/0/0).
    *
    * @type {string}
    */
   get path () {
-    // TODO: Return the proper path for the account
+    return this._path
   }
 
   /**
-   * The account's key pair.
-   *
    * @type {KeyPair}
    */
   get keyPair () {
-    // TODO: Return the proper key pair for the account
+    return {
+      privateKey: this._rawPrivateKey ?? null,
+      publicKey: this._rawPublicKey
+    }
   }
 
   /**
-   * Signs a message.
-   *
-   * @param {string} message - The message to sign.
-   * @returns {Promise<string>} The message's signature.
+   * @returns {Promise<string>} Hex-encoded x-only public key (64 chars).
+   */
+  async getAddress () {
+    if (!this._pubkeyHex) {
+      throw new Error("The account's address must be set to perform this operation.")
+    }
+    return this._pubkeyHex
+  }
+
+  /**
+   * @param {string} message - UTF-8 message.
+   * @returns {Promise<string>} Hex-encoded Schnorr signature.
    */
   async sign (message) {
-    // TODO: Implement blockchain-specific message signing
+    if (!this._rawPrivateKey) {
+      throw new Error('The wallet account has been disposed.')
+    }
+    return signMessage(message, this._rawPrivateKey)
   }
 
   /**
-   * Sends a transaction.
+   * Builds, signs, and publishes a Nostr event to a relay WebSocket.
    *
-   * @param {NostrTransaction} tx - The transaction.
-   * @returns {Promise<TransactionResult>} The transaction's result.
+   * @param {NostrTransaction} tx - Event fields and optional relay override.
+   * @returns {Promise<TransactionResult>} Event id as `hash`, `fee` 0.
    */
   async sendTransaction (tx) {
-    // TODO: Implement blockchain-specific transaction sending
+    if (!this._rawPrivateKey) {
+      throw new Error('The wallet account has been disposed.')
+    }
+
+    const relayUrl = tx.relayUrl ?? this._config.relayUrl
+    if (!relayUrl) {
+      throw new Error(
+        'A relay URL is required to publish. Set config.relayUrl or tx.relayUrl (e.g. wss://relay.damus.io).'
+      )
+    }
+
+    const eventTemplate = {
+      kind: tx.kind ?? 1,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: tx.tags ?? [],
+      content: tx.content ?? ''
+    }
+
+    const event = finalizeEvent(eventTemplate, this._rawPrivateKey)
+    await publishEvent(relayUrl, event)
+
+    return { hash: event.id, fee: 0n }
   }
 
   /**
-   * Transfers a token to another address.
+   * Nostr has no generic token transfer in this module.
    *
-   * @param {TransferOptions} options - The transfer's options.
-   * @returns {Promise<TransferResult>} The transfer's result.
+   * @param {TransferOptions} _options - Unused.
+   * @returns {Promise<TransferResult>}
    */
-  async transfer (options) {
-    // TODO: Implement blockchain-specific token transfer
+  async transfer (_options) {
+    throw new Error('Token transfers are not supported for the Nostr wallet module.')
   }
 
   /**
-   * Returns a read-only copy of the account.
-   *
-   * @returns {Promise<WalletAccountReadOnlyNostr>} The read-only account.
+   * @returns {Promise<WalletAccountReadOnlyNostr>}
    */
   async toReadOnlyAccount () {
-    // TODO: Implement conversion to read-only account
+    const address = await this.getAddress()
+    return new WalletAccountReadOnlyNostr(address, this._config)
   }
 
-  /**
-   * Disposes the wallet account, erasing the private key from the memory.
-   */
   dispose () {
-    // TODO: Implement disposal of sensitive data e.g., the private key
+    if (this._rawPrivateKey) {
+      this._rawPrivateKey.fill(0)
+      this._rawPrivateKey = undefined
+    }
+    this._rawPublicKey = undefined
+    this._pubkeyHex = undefined
+    this._seed = undefined
   }
 }

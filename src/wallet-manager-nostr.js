@@ -48,8 +48,8 @@ export default class WalletManagerNostr extends WalletManager {
    * @returns {Promise<WalletAccountNostr>} The account.
    */
   async getAccount (index = 0) {
-    // TODO: Update derivation path according to nostr
-    const account = await this.getAccountByPath(`0'/0/${index}`)
+    // NIP-06: m/44'/1237'/<account>'/0/0 — see wallet-account-nostr.js
+    const account = await this.getAccountByPath(`${index}'/0/0`)
 
     return account
   }
@@ -76,6 +76,9 @@ export default class WalletManagerNostr extends WalletManager {
    * @returns {Promise<FeeRates>} The fee rates (in base units).
    */
   async getFeeRates () {
-    // TODO: Implement blockchain-specific fee rate fetching
+    return {
+      normal: 0n,
+      fast: 0n
+    }
   }
 }

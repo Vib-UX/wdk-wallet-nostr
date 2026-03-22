@@ -2,7 +2,7 @@ export default class WalletAccountReadOnlyNostr extends WalletAccountReadOnly {
     /**
      * Creates a new nostr read-only wallet account.
      *
-     * @param {string} address - The account's address.
+     * @param {string} address - The account's public key (64 hex chars).
      * @param {Omit<NostrWalletConfig, 'transferMaxFee'>} [config] - The configuration object.
      */
     constructor(address: string, config?: Omit<NostrWalletConfig, 'transferMaxFee'>);
@@ -19,7 +19,6 @@ export default class WalletAccountReadOnlyNostr extends WalletAccountReadOnly {
      * @param {string} message - The original message.
      * @param {string} signature - The signature to verify.
      * @returns {Promise<boolean>} True if the signature is valid.
-     * @throws {Error} If the read-only wallet account class is not able to provide an implementation for the method.
      */
     verify(message: string, signature: string): Promise<boolean>;
     /**
@@ -62,17 +61,29 @@ export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
 export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
 export type NostrTransaction = {
     /**
-     * - The transaction's recipient.
+     * Nostr event kind (default 1).
      */
-    to: string;
+    kind?: number;
     /**
-     * - The amount of native coins to send to the recipient (in base units).
+     * Event content.
      */
-    value: number | bigint;
+    content?: string;
+    /**
+     * Event tags.
+     */
+    tags?: string[][];
+    /**
+     * Relay WebSocket URL for this publish (overrides config).
+     */
+    relayUrl?: string;
 };
 export type NostrWalletConfig = {
     /**
-     * - The maximum fee amount for transfer operations.
+     * Default relay URL for publishing (wss://…).
+     */
+    relayUrl?: string;
+    /**
+     * Reserved for API parity; Nostr publishing has no fee in this module.
      */
     transferMaxFee?: number | bigint;
 };

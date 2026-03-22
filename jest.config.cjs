@@ -1,0 +1,8 @@
+'use strict'
+
+/** @type {import('jest').Config} */
+module.exports = {
+  testEnvironment: 'node',
+  transform: {},
+  testMatch: ['**/tests/**/*.test.js']
+}

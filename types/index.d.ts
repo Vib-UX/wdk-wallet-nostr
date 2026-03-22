@@ -1,0 +1,10 @@
+export { default } from "./src/wallet-manager-nostr.js";
+export { default as WalletAccountReadOnlyNostr } from "./src/wallet-account-read-only-nostr.js";
+export { default as WalletAccountNostr } from "./src/wallet-account-nostr.js";
+export type FeeRates = import("@tetherto/wdk-wallet").FeeRates;
+export type KeyPair = import("@tetherto/wdk-wallet").KeyPair;
+export type TransactionResult = import("@tetherto/wdk-wallet").TransactionResult;
+export type TransferOptions = import("@tetherto/wdk-wallet").TransferOptions;
+export type TransferResult = import("@tetherto/wdk-wallet").TransferResult;
+export type NostrTransaction = import("./src/wallet-account-read-only-nostr.js").NostrTransaction;
+export type NostrWalletConfig = import("./src/wallet-account-read-only-nostr.js").NostrWalletConfig;

@@ -18,7 +18,9 @@
     "lint": "standard",
     "lint:fix": "standard --fix",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "git:commit": "git -c core.hooksPath=scripts/no-hooks commit -F commitmsg",
+    "git:amend": "git -c core.hooksPath=scripts/no-hooks commit --amend -F commitmsg"
   },
   "dependencies": {
     "@scure/bip32": "^2.0.1",

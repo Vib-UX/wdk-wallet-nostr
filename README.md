@@ -1,6 +1,8 @@
 # wdk-wallet-nostr
 
-WDK module to create and manage BIP-32 wallets for the nostr blockchain.
+[WDK](https://docs.wdk.tether.io/) wallet module for **Nostr**: BIP-39 seed, [NIP-06](https://github.com/nostr-protocol/nips/blob/master/06.md) key derivation, Schnorr signing, and publishing signed events to relays over WebSockets.
+
+Extends [`@tetherto/wdk-wallet`](https://github.com/tetherto/wdk-wallet) (`WalletManager`, `WalletAccountReadOnly`).
 
 ## Installation
 
@@ -8,89 +10,81 @@ WDK module to create and manage BIP-32 wallets for the nostr blockchain.
 npm install wdk-wallet-nostr
 ```
 
+Requires a Node-style environment with **`ws`** available (used to connect to `wss://` relays).
+
+## Key derivation
+
+Accounts follow **NIP-06** + SLIP-0044 coin type **1237**:
+
+`m/44'/1237'/<account>'/0/0`
+
+`WalletManagerNostr.getAccount(n)` uses the path suffix `n'/0/0` (so the first account is `m/44'/1237'/0'/0/0`).
+
 ## Usage
 
 ```javascript
 import WalletManagerNostr from 'wdk-wallet-nostr'
 
-// Create wallet from mnemonic
-const wallet = new WalletManagerNostr('your twelve word mnemonic phrase here ...')
+const wallet = new WalletManagerNostr('your twelve word mnemonic phrase here ...', {
+  relayUrl: 'wss://relay.damus.io' // default relay for publishing (optional per send)
+})
 
-// Get an account
 const account = await wallet.getAccount(0)
 
-// Get the address
-const address = await account.getAddress()
-console.log('Address:', address)
+// "Address" is the hex-encoded x-only secp256k1 public key (64 characters).
+const pubkeyHex = await account.getAddress()
 
-// Get balance
-const balance = await account.getBalance()
-console.log('Balance:', balance)
-
-// Sign a message
+// Schnorr signature over SHA-256(UTF-8 message) — hex string
 const signature = await account.sign('Hello, World!')
-console.log('Signature:', signature)
 
-// Clean up
+// Publish a signed event (kind 1 text note by default). Requires relayUrl in config or on tx.
+const { hash, fee } = await account.sendTransaction({
+  kind: 1,
+  content: 'Hello from WDK',
+  tags: [],
+  relayUrl: 'wss://relay.damus.io' // optional if wallet config.relayUrl is set
+})
+// hash = Nostr event id; fee is always 0n (no protocol fee in this module)
+
 wallet.dispose()
 ```
 
-## API Reference
+Also exported: `WalletAccountNostr`, `WalletAccountReadOnlyNostr`.
 
-### WalletManagerNostr
+## Behaviour notes
 
-#### Constructor
+| Topic | Behaviour |
+| --- | --- |
+| **Balance** | `getBalance()` / `getTokenBalance()` return `0n`. Nostr has no on-chain native token in this module. |
+| **`sendTransaction(tx)`** | Builds and signs an event with `nostr-tools` / `finalizeEvent`, then publishes via WebSocket. `tx`: `{ kind?, content?, tags?, relayUrl? }`. |
+| **`transfer()`** | Not supported; throws. |
+| **`getFeeRates()`** | Returns `{ normal: 0n, fast: 0n }`. |
+| **`verify()`** | On the read-only or full account; checks signatures produced by `sign()`. |
 
-```javascript
-new WalletManagerNostr(seed, config?)
-```
+## API sketch
 
-- `seed` - BIP-39 mnemonic phrase or seed bytes
-- `config` - Optional configuration object
-  - `transferMaxFee` - Maximum allowed transaction fee
+### `WalletManagerNostr(seed, config?)`
 
-#### Methods
+- **seed** — BIP-39 mnemonic string or seed bytes (`Uint8Array`).
+- **config** — `relayUrl?: string`, `transferMaxFee?: bigint \| number` (reserved for API parity).
 
-- `getAccount(index?)` - Get account at specified index (default: 0)
-- `getAccountByPath(path)` - Get account at custom derivation path
-- `getFeeRates()` - Get current network fee rates
-- `dispose()` - Clean up and dispose all accounts
+Methods: `getAccount(index?)`, `getAccountByPath(path)`, `getFeeRates()`, `dispose()` (from base manager).
 
-### WalletAccountNostr
+### `WalletAccountNostr`
 
-#### Properties
+Properties: `index`, `path`, `keyPair` (`{ publicKey: Uint8Array, privateKey: Uint8Array \| null }`).
 
-- `index` - Account index
-- `path` - Full derivation path
-- `keyPair` - Public and private key pair
-
-#### Methods
-
-- `getAddress()` - Get account address
-- `getBalance()` - Get native token balance
-- `getTokenBalance(tokenAddress)` - Get token balance
-- `sendTransaction(tx)` - Send a transaction
-- `transfer(options)` - Transfer tokens
-- `sign(message)` - Sign a message
-- `verify(message, signature)` - Verify a signature
-- `toReadOnlyAccount()` - Create read-only copy
-- `dispose()` - Clean up sensitive data
+Methods: `getAddress()`, `sign()`, `verify()`, `sendTransaction(tx)`, `transfer()` (unsupported), `toReadOnlyAccount()`, `dispose()`, plus read-only helpers inherited from `WalletAccountReadOnlyNostr`.
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Run tests
 npm test
-
-# Run linter
 npm run lint
-
-# Build types
-npm run build:types
 ```
+
+Type definitions are published under `./types` (see `package.json` `"types"`).
 
 ## License
 
